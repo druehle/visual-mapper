@@ -4,6 +4,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>visual mapper</title>
     <style>
+        html, body {
+            overflow: hidden;
+        }
         body {
             margin: 0;
             padding: 20px;
@@ -232,10 +235,9 @@
             cursor: crosshair;
         }
         
-        .instructions {
-            margin-top: 10px;
-            color: #666;
-            font-size: 14px;
+        #miniMap {
+        border-radius: 8px;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
         }
     </style>
 </head>
@@ -269,6 +271,9 @@
                     <button onclick="expandCanvas('bottom')">↓</button>
                 </div>
             </div>
+
+            <canvas id="miniMap" width="160" height="120" style="position: absolute; top: 10px; right: 10px; border: 2px solid rgb(122, 122, 122); background: rgba(255,255,255,0.8); z-index: 10;"></canvas>
+
             <div class="color-squares" id="colorPalette">
                 <!-- Color squares will be generated here -->
             </div>
@@ -305,6 +310,9 @@
         const textInputOverlay = document.getElementById('textInputOverlay');
         const textInput = document.getElementById('textInput');
         const textModeBtn = document.getElementById('textModeBtn');
+
+        const miniMap = document.getElementById('miniMap');
+        const miniCtx = miniMap.getContext('2d');
 
         let autoSaveInterval;
 
@@ -343,6 +351,16 @@
         let canvasHeight = 600;
         let isTextMode = false;
         let pendingTextPosition = null;
+
+        const scale = miniMap.width / canvas.width;
+
+        function drawMiniMap() {
+            // Clear minimap
+            miniCtx.clearRect(0, 0, miniMap.width, miniMap.height);
+
+            // Draw scaled-down main canvas
+            miniCtx.drawImage(canvas, 0, 0, miniMap.width, miniMap.height);
+        }
 
         window.addEventListener('beforeunload', function (e) {
             saveCanvasToLocalStorage();
@@ -415,7 +433,7 @@
                     // Draw colored square
                     ctx.fillStyle = square.color;
                     ctx.fillRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
-                    ctx.strokeStyle = '#DDD';
+                    ctx.strokeStyle = square.color;//'#DDD';
                     ctx.lineWidth = 0;
                     ctx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
                 } else if (square.type === 'pattern') {
@@ -428,12 +446,12 @@
                     
                     // Draw pattern
                     ctx.strokeStyle = '#333';
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 1;
                     ctx.beginPath();
                     
                     const centerX = square.x + GRID_SIZE / 2;
                     const centerY = square.y + GRID_SIZE / 2;
-                    const margin = 1;
+                    const margin = 0;
                     
                     switch (square.pattern) {
                         case 'horizontal':
@@ -456,6 +474,13 @@
                     ctx.stroke();
                 }
             });
+
+            let last = placedSquares[placedSquares.length - 1];
+            if (last && (last.type === 'color' || last.type === "pattern")) {
+                ctx.strokeStyle = '#800000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(last.x, last.y, GRID_SIZE, GRID_SIZE);
+            }
             
             // Draw text
             placedTexts.forEach(textObj => {
@@ -472,6 +497,7 @@
             ctx.clearRect(0, 0, canvasWidth, canvasHeight);
             drawGrid();
             drawSquares();
+            drawMiniMap();
         }
         
         // Update canvas size
@@ -564,7 +590,7 @@
                     fromCanvas: true
                 };
                 isDragging = true;
-                canvas.style.cursor = 'crosshair';
+                canvas.style.cursor = 'grabbing';
                 
                 // Remove square from canvas while dragging
                 placedSquares.splice(index, 1);
