@@ -315,6 +315,7 @@
         const miniCtx = miniMap.getContext('2d');
 
         let autoSaveInterval;
+        let last;
 
         //startAutoSave(30000); //This starts auto-saving
         
@@ -428,7 +429,8 @@
         
         // Draw all placed squares and text
         function drawSquares() {
-            placedSquares.forEach(square => {
+
+            placedSquares.forEach((square, index) => {
                 if (square.type === 'color') {
                     // Draw colored square
                     ctx.fillStyle = square.color;
@@ -436,6 +438,8 @@
                     ctx.strokeStyle = square.color;//'#DDD';
                     ctx.lineWidth = 0;
                     ctx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    last = placedSquares[index];
+
                 } else if (square.type === 'pattern') {
                     // Draw pattern square
                     ctx.fillStyle = 'white';
@@ -475,8 +479,9 @@
                 }
             });
 
-            let last = placedSquares[placedSquares.length - 1];
-            if (last && (last.type === 'color' || last.type === "pattern")) {
+            
+            //if (last && (last.type === 'color' || last.type === "pattern")) {
+            if (last) {
                 ctx.strokeStyle = '#800000';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(last.x, last.y, GRID_SIZE, GRID_SIZE);
