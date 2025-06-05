@@ -1,0 +1,922 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>visual mapper</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #FFFFFF;
+        }
+        
+        .container {
+            max-width: 1200px;
+            /*margin: 0 auto;*/
+        }
+        
+        .palette {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .palette h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        
+        .palette-section {
+            margin-bottom: 20px;
+        }
+        
+        .palette-section h4 {
+            margin: 0 0 10px 0;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .color-squares, .pattern-squares {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .color-square, .pattern-square {
+            width: 40px;
+            height: 40px;
+            /*cursor: grab;*/
+            border: 0px solid #000000;
+            border-radius: 4px;
+            transition: transform 0.1s;
+            position: relative;
+        }
+        
+        .color-square:hover, .pattern-square:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-square:active, .pattern-square:active {
+            /*cursor: grabbing;*/
+        }
+        
+        .pattern-square {
+            background: white;
+        }
+        
+        .trash-can {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .trash-can.drag-over {
+            background: #ff0000;
+            transform: scale(1.2);
+        }
+        
+        .controls {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            /*box-shadow: 0 2px 10px rgba(0,0,0,0.1);*/
+            border: 1px solid black;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .text-input-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .text-input-dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+        
+        .text-input-dialog h3 {
+            margin: 0 0 20px 0;
+            color: #333;
+        }
+        
+        .text-input-dialog input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        
+        .text-input-dialog input[type="text"]:focus {
+            border-color: #4ECDC4;
+            outline: none;
+        }
+        
+        .text-input-dialog .dialog-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .text-input-dialog button {
+            padding: 10px 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .control-group h4 {
+            margin: 0;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            border: 2px solid #000000;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #f0f0f0;
+            transform: translateY(-1px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .expand-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px;
+            width: 120px;
+        }
+        
+        .expand-buttons button {
+            padding: 6px;
+            font-size: 10px;
+        }
+        
+        .expand-buttons .center {
+            grid-column: 2;
+            grid-row: 2;
+            background: #eee;
+            cursor: default;
+        }
+        
+        .expand-buttons .center:hover {
+            background: #eee;
+            transform: none;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .canvas-container {
+            /*background: white;*/
+            padding: 20px;
+            border-radius: 8px;
+            
+            width: 1200px;
+            height: 500px;
+            overflow: auto;
+            border: 1px solid #ccc;
+            /*box-shadow: 0 2px 10px rgba(0,0,0,0.1);*/
+        }
+        
+        canvas {
+            /*border: 2px solid #333;*/
+            display: block;
+            cursor: crosshair;
+        }
+        
+        .instructions {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body >
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <h4>File:</h4>
+                <button onclick="saveCanvas()">Save</button>
+                <button onclick="document.getElementById('fileInput').click()">Load</button>
+                <button onclick="exportCanvasAsPNG()">Export PNG</button>
+                <input type="file" id="fileInput" accept=".json" onchange="loadCanvas(event)">
+                <button onclick="loadCanvasFromStorage()">Restore Map</button>
+            </div>
+            
+            <div class="control-group">
+                <button id="textModeBtn" onclick="toggleTextMode()">Text Mode: OFF</button>
+            </div>
+            
+            <div class="control-group">
+                <h4>Canvas Size:</h4>
+                <span id="canvasSize">1200×600</span>
+            </div>
+            
+            <div class="control-group">
+                <h4>Expand Canvas:</h4>
+                <div class="expand-buttons">
+                    <button onclick="expandCanvas('left')">←</button>
+                    <button onclick="expandCanvas('top')">↑</button><br>
+                    <button onclick="expandCanvas('right')">→</button>
+                    <button onclick="expandCanvas('bottom')">↓</button>
+                </div>
+            </div>
+            <div class="color-squares" id="colorPalette">
+                <!-- Color squares will be generated here -->
+            </div>
+            <div class="pattern-squares" id="patternPalette">
+                <!-- Pattern squares will be generated here -->
+            </div>
+        </div>
+       
+        <div class="canvas-container">
+            <canvas id="canvas" width="1200" height="600"></canvas>
+        </div>
+        
+        <div class="trash-can" id="trashCan">🗑️</div>
+        
+        <!-- Text Input Dialog -->
+        <div class="text-input-overlay" id="textInputOverlay">
+            <div class="text-input-dialog">
+                <h3>Add Text</h3>
+                <input type="text" id="textInput" placeholder="Enter your text here..." maxlength="50">
+                <div class="dialog-buttons">
+                    <button onclick="cancelTextInput()">Cancel</button>
+                    <button onclick="confirmTextInput()">Add Text</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const colorPalette = document.getElementById('colorPalette');
+        const patternPalette = document.getElementById('patternPalette');
+        const trashCan = document.getElementById('trashCan');
+        const textInputOverlay = document.getElementById('textInputOverlay');
+        const textInput = document.getElementById('textInput');
+        const textModeBtn = document.getElementById('textModeBtn');
+
+        let autoSaveInterval;
+
+        //startAutoSave(30000); //This starts auto-saving
+        
+        const GRID_SIZE = 40;
+        const colors = [
+        '#E57373', // Muted Bright Red
+        '#81C784', // Muted Bright Green
+        '#D3C96A', // Soft Yellow
+        '#6A96D3', // Soft Blue
+        '#B76AD3', // Soft Magenta
+        '#6AD3C9', // Soft Cyan
+        '#FFEB99', // Muted Bright Yellow
+        '#64B5F6', // Muted Bright Blue
+        '#CE93D8', // Muted Bright Magenta
+        '#4DD0E1', // Muted Bright Cyan
+        '#999999', // Soft Gray (ANSI Black)
+        '#F4A261', // Soft Orange
+        '#D8D8D8'  // Soft Bright Gray (instead of white)
+        ];
+        
+        const patterns = [
+            { name: 'horizontal', display: '━' },
+            { name: 'vertical', display: '┃' },
+            { name: 'diagonal-right', display: '╲' },
+            { name: 'diagonal-left', display: '╱' }
+        ];
+        
+        let placedSquares = [];
+        let placedTexts = [];
+        let isDragging = false;
+        let dragData = null;
+        let draggedSquareIndex = -1;
+        let canvasWidth = 1200;
+        let canvasHeight = 600;
+        let isTextMode = false;
+        let pendingTextPosition = null;
+
+        window.addEventListener('beforeunload', function (e) {
+            saveCanvasToLocalStorage();
+            e.preventDefault();
+            e.returnValue = ''; // Required for Chrome to show prompt
+        });
+        
+        // Create color palette
+        colors.forEach(color => {
+            const square = document.createElement('div');
+            square.className = 'color-square';
+            square.style.backgroundColor = color;
+            square.draggable = true;
+            square.dataset.color = color;
+            
+            square.addEventListener('dragstart', (e) => {
+                dragData = { type: 'color', color: color };
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+            
+            colorPalette.appendChild(square);
+        });
+        
+        // Create pattern palette
+        patterns.forEach(pattern => {
+            const square = document.createElement('div');
+            square.className = 'pattern-square';
+            square.draggable = true;
+            square.dataset.pattern = pattern.name;
+            square.style.fontSize = '24px';
+            square.style.display = 'flex';
+            square.style.alignItems = 'center';
+            square.style.justifyContent = 'center';
+            square.textContent = pattern.display;
+            
+            square.addEventListener('dragstart', (e) => {
+                dragData = { type: 'pattern', pattern: pattern.name };
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+            
+            patternPalette.appendChild(square);
+        });
+        
+        // Draw grid lines
+        function drawGrid() {
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines
+            for (let x = 0; x <= canvasWidth; x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvasHeight);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for (let y = 0; y <= canvasHeight; y += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvasWidth, y);
+                ctx.stroke();
+            }
+        }
+        
+        // Draw all placed squares and text
+        function drawSquares() {
+            placedSquares.forEach(square => {
+                if (square.type === 'color') {
+                    // Draw colored square
+                    ctx.fillStyle = square.color;
+                    ctx.fillRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    ctx.strokeStyle = '#DDD';
+                    ctx.lineWidth = 0;
+                    ctx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                } else if (square.type === 'pattern') {
+                    // Draw pattern square
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    ctx.strokeStyle = '#DDD';
+                    ctx.lineWidth = 0;
+                    ctx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    
+                    // Draw pattern
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    
+                    const centerX = square.x + GRID_SIZE / 2;
+                    const centerY = square.y + GRID_SIZE / 2;
+                    const margin = 1;
+                    
+                    switch (square.pattern) {
+                        case 'horizontal':
+                            ctx.moveTo(square.x + margin, centerY);
+                            ctx.lineTo(square.x + GRID_SIZE - margin, centerY);
+                            break;
+                        case 'vertical':
+                            ctx.moveTo(centerX, square.y + margin);
+                            ctx.lineTo(centerX, square.y + GRID_SIZE - margin);
+                            break;
+                        case 'diagonal-right':
+                            ctx.moveTo(square.x + margin, square.y + margin);
+                            ctx.lineTo(square.x + GRID_SIZE - margin, square.y + GRID_SIZE - margin);
+                            break;
+                        case 'diagonal-left':
+                            ctx.moveTo(square.x + GRID_SIZE - margin, square.y + margin);
+                            ctx.lineTo(square.x + margin, square.y + GRID_SIZE - margin);
+                            break;
+                    }
+                    ctx.stroke();
+                }
+            });
+            
+            // Draw text
+            placedTexts.forEach(textObj => {
+                ctx.fillStyle = '#333';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(textObj.text, textObj.x, textObj.y);
+            });
+        }
+        
+        // Redraw canvas
+        function redraw() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            drawGrid();
+            drawSquares();
+        }
+        
+        // Update canvas size
+        function updateCanvasSize() {
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            document.getElementById('canvasSize').textContent = `${canvasWidth}×${canvasHeight}`;
+            redraw();
+        }
+        
+        // Snap coordinates to grid
+        function snapToGrid(x, y) {
+            return {
+                x: Math.floor(x / GRID_SIZE) * GRID_SIZE,
+                y: Math.floor(y / GRID_SIZE) * GRID_SIZE
+            };
+        }
+        
+        // Check if position is occupied
+        function isPositionOccupied(x, y) {
+            return placedSquares.some(square => square.x === x && square.y === y);
+        }
+        
+        // Canvas drag and drop events
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            
+            if (!dragData) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const snappedPos = snapToGrid(x, y);
+            
+            // Check bounds
+            if (snappedPos.x >= 0 && snappedPos.x + GRID_SIZE <= canvasWidth &&
+                snappedPos.y >= 0 && snappedPos.y + GRID_SIZE <= canvasHeight) {
+                
+                // Check if position is free
+                if (!isPositionOccupied(snappedPos.x, snappedPos.y)) {
+                    const newSquare = {
+                        x: snappedPos.x,
+                        y: snappedPos.y,
+                        type: dragData.type
+                    };
+                    
+                    if (dragData.type === 'color') {
+                        newSquare.color = dragData.color;
+                    } else if (dragData.type === 'pattern') {
+                        newSquare.pattern = dragData.pattern;
+                    }
+                    
+                    placedSquares.push(newSquare);
+                    redraw();
+                }
+            }
+            
+            dragData = null;
+            draggedSquareIndex = -1;
+        });
+        
+        // Canvas mouse events for dragging placed squares
+        canvas.addEventListener('mousedown', (e) => {
+            if (isTextMode) return; // Don't handle dragging in text mode
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const snappedPos = snapToGrid(x, y);
+            
+            // Find square at this position
+            const index = placedSquares.findIndex(square => 
+                square.x === snappedPos.x && square.y === snappedPos.y
+            );
+            
+            if (index !== -1) {
+                draggedSquareIndex = index;
+                const square = placedSquares[index];
+                dragData = {
+                    type: square.type,
+                    color: square.color,
+                    pattern: square.pattern,
+                    fromCanvas: true
+                };
+                isDragging = true;
+                canvas.style.cursor = 'crosshair';
+                
+                // Remove square from canvas while dragging
+                placedSquares.splice(index, 1);
+                redraw();
+            }
+        });
+        
+        // Handle text mode clicks
+        canvas.addEventListener('click', (e) => {
+            if (!isTextMode) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Store the click position and show text input dialog
+            pendingTextPosition = { x: x, y: y };
+            showTextInput();
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                // Visual feedback could be added here
+            }
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            if (isTextMode) return; // Don't handle dragging in text mode
+            
+            if (isDragging && dragData && dragData.fromCanvas) {
+                // Re-place the square if dropped on canvas
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const snappedPos = snapToGrid(x, y);
+                
+                // Check bounds
+                if (snappedPos.x >= 0 && snappedPos.x + GRID_SIZE <= canvasWidth &&
+                    snappedPos.y >= 0 && snappedPos.y + GRID_SIZE <= canvasHeight) {
+                    
+                    // Check if position is free
+                    if (!isPositionOccupied(snappedPos.x, snappedPos.y)) {
+                        const newSquare = {
+                            x: snappedPos.x,
+                            y: snappedPos.y,
+                            type: dragData.type
+                        };
+                        
+                        if (dragData.type === 'color') {
+                            newSquare.color = dragData.color;
+                        } else if (dragData.type === 'pattern') {
+                            newSquare.pattern = dragData.pattern;
+                        }
+                        
+                        placedSquares.push(newSquare);
+                        redraw();
+                    }
+                }
+            }
+            
+            isDragging = false;
+            dragData = null;
+            draggedSquareIndex = -1;
+            canvas.style.cursor = isTextMode ? 'text' : 'crosshair';
+        });
+        
+        // Trash can functionality
+        trashCan.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            trashCan.classList.add('drag-over');
+        });
+        
+        trashCan.addEventListener('dragleave', () => {
+            trashCan.classList.remove('drag-over');
+        });
+        
+        trashCan.addEventListener('drop', (e) => {
+            e.preventDefault();
+            trashCan.classList.remove('drag-over');
+            
+            // If dragging from canvas, the square is already removed
+            if (dragData && dragData.fromCanvas) {
+                // Square is deleted (not re-added to canvas)
+            }
+            
+            dragData = null;
+            draggedSquareIndex = -1;
+            redraw();
+        });
+        
+        // Canvas expansion functions
+        function expandCanvas(direction) {
+            const expansion = 200;
+            
+            switch (direction) {
+                case 'top':
+                    canvasHeight += expansion;
+                    // Move all existing squares down
+                    placedSquares.forEach(square => {
+                        square.y += expansion;
+                    });
+                    // Move all existing text down
+                    placedTexts.forEach(textObj => {
+                        textObj.y += expansion;
+                    });
+                    break;
+                case 'bottom':
+                    canvasHeight += expansion;
+                    break;
+                case 'left':
+                    canvasWidth += expansion;
+                    // Move all existing squares right
+                    placedSquares.forEach(square => {
+                        square.x += expansion;
+                    });
+                    // Move all existing text right
+                    placedTexts.forEach(textObj => {
+                        textObj.x += expansion;
+                    });
+                    break;
+                case 'right':
+                    canvasWidth += expansion;
+                    break;
+            }
+            
+            updateCanvasSize();
+        }
+        
+        // Text mode functions
+        function toggleTextMode() {
+            isTextMode = !isTextMode;
+            textModeBtn.textContent = `Text Mode: ${isTextMode ? 'ON' : 'OFF'}`;
+            textModeBtn.style.background = isTextMode ? '#4ECDC4' : 'white';
+            textModeBtn.style.color = isTextMode ? 'white' : 'black';
+            canvas.style.cursor = isTextMode ? 'text' : 'crosshair';
+        }
+        
+        function showTextInput() {
+            textInputOverlay.style.display = 'flex';
+            textInput.value = '';
+            textInput.focus();
+        }
+        
+        function cancelTextInput() {
+            textInputOverlay.style.display = 'none';
+            pendingTextPosition = null;
+        }
+        
+        function confirmTextInput() {
+            const text = textInput.value.trim();
+            if (text && pendingTextPosition) {
+                placedTexts.push({
+                    x: pendingTextPosition.x,
+                    y: pendingTextPosition.y,
+                    text: text
+                });
+                redraw();
+            }
+            textInputOverlay.style.display = 'none';
+            pendingTextPosition = null;
+        }
+        
+        // Handle Enter key in text input
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                confirmTextInput();
+            } else if (e.key === 'Escape') {
+                cancelTextInput();
+            }
+        });
+        
+        // Save canvas data to localStorage
+        function saveCanvasToLocalStorage() {
+            const saveData = {
+                width: canvasWidth,
+                height: canvasHeight,
+                squares: placedSquares,
+                texts: placedTexts,
+                timestamp: new Date().toISOString()
+            };
+
+            localStorage.setItem('savedCanvas', JSON.stringify(saveData));
+            console.log(`[${new Date().toLocaleTimeString()}] Canvas auto-saved to localStorage.`);
+        }
+
+        // Load saved canvas data (if you want to restore it)
+        function loadCanvasFromStorage() {
+
+
+            const savedData = localStorage.getItem('savedCanvas');
+            if (!savedData) {
+                alert("No saved canvas data found.");
+                return;
+            }
+
+            if (confirm("Restore autosaved map?")) {
+                const data = JSON.parse(savedData);
+                canvasWidth = data.width;
+                canvasHeight = data.height;
+                placedSquares = data.squares;
+                placedTexts = data.texts;
+                console.log("Canvas data loaded from localStorage.");
+
+                updateCanvasSize();
+            }
+        }
+
+        //Start AutoSave function
+        function startAutoSave(intervalMs = 30000) {
+            if (autoSaveInterval) return; // Prevent multiple intervals
+
+            autoSaveInterval = setInterval(saveCanvasToLocalStorage, intervalMs);
+            console.log(`Auto-save started, every ${intervalMs / 1000} seconds.`);
+        }
+
+
+        // Save canvas function
+        function saveCanvas() {
+            const saveData = {
+                width: canvasWidth,
+                height: canvasHeight,
+                squares: placedSquares,
+                texts: placedTexts,
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(saveData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            let fileName = prompt("Enter map file name:");
+
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = fileName + ".json";
+            link.click();
+        }
+        
+        // Load canvas function
+        function loadCanvas(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const saveData = JSON.parse(e.target.result);
+                    
+                    // Validate the data structure
+                    if (saveData.width && saveData.height && Array.isArray(saveData.squares)) {
+                        canvasWidth = saveData.width;
+                        canvasHeight = saveData.height;
+                        placedSquares = saveData.squares;
+                        placedTexts = Array.isArray(saveData.texts) ? saveData.texts : [];
+                        
+                        updateCanvasSize();
+                        
+                        alert('Canvas loaded successfully!');
+                    } else {
+                        alert('Invalid file format!');
+                    }
+                } catch (error) {
+                    alert('Error loading file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Clear the file input
+            event.target.value = '';
+        }
+        
+        // Export canvas as PNG (without grid)
+        function exportCanvasAsPNG() {
+            // Create a temporary canvas for export
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvasWidth;
+            exportCanvas.height = canvasHeight;
+            const exportCtx = exportCanvas.getContext('2d');
+            
+            // Fill with white background
+            exportCtx.fillStyle = 'white';
+            exportCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            // Draw only the placed squares (no grid)
+            placedSquares.forEach(square => {
+                if (square.type === 'color') {
+                    // Draw colored square
+                    exportCtx.fillStyle = square.color;
+                    exportCtx.fillRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    exportCtx.strokeStyle = '#FFF';
+                    exportCtx.lineWidth = 2;
+                    exportCtx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                } else if (square.type === 'pattern') {
+                    // Draw pattern square
+                    exportCtx.fillStyle = 'white';
+                    exportCtx.fillRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    exportCtx.strokeStyle = '#FFF';
+                    exportCtx.lineWidth = 2;
+                    exportCtx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
+                    
+                    // Draw pattern
+                    exportCtx.strokeStyle = '#333';
+                    exportCtx.lineWidth = 3;
+                    exportCtx.beginPath();
+                    
+                    const centerX = square.x + GRID_SIZE / 2;
+                    const centerY = square.y + GRID_SIZE / 2;
+                    const margin = 1;
+                    
+                    switch (square.pattern) {
+                        case 'horizontal':
+                            exportCtx.moveTo(square.x + margin, centerY);
+                            exportCtx.lineTo(square.x + GRID_SIZE - margin, centerY);
+                            break;
+                        case 'vertical':
+                            exportCtx.moveTo(centerX, square.y + margin);
+                            exportCtx.lineTo(centerX, square.y + GRID_SIZE - margin);
+                            break;
+                        case 'diagonal-right':
+                            exportCtx.moveTo(square.x + margin, square.y + margin);
+                            exportCtx.lineTo(square.x + GRID_SIZE - margin, square.y + GRID_SIZE - margin);
+                            break;
+                        case 'diagonal-left':
+                            exportCtx.moveTo(square.x + GRID_SIZE - margin, square.y + margin);
+                            exportCtx.lineTo(square.x + margin, square.y + GRID_SIZE - margin);
+                            break;
+                    }
+                    exportCtx.stroke();
+                }
+            });
+
+            placedTexts.forEach(textObj => {
+                exportCtx.fillStyle = '#333';
+                exportCtx.font = '16px Arial';
+                exportCtx.textAlign = 'left';
+                exportCtx.textBaseline = 'top';
+                exportCtx.fillText(textObj.text, textObj.x, textObj.y);
+            });
+            
+            let fileName = prompt("Enter map file name:");
+
+            // Convert to blob and download
+            exportCanvas.toBlob(function(blob) {
+                let link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName + ".png";
+                link.click();
+            }, 'image/png');
+        }
+        
+        // Initial setup
+        updateCanvasSize();
+    </script>
+</body>
+</html>
