@@ -281,20 +281,13 @@
         <div class="controls">
             <div class="control-group">
                 <h4>File:</h4>
-                <button onclick="saveCanvas()">Save</button>
-                <button onclick="document.getElementById('fileInput').click()">Load</button>
+                <button onclick="saveCanvas()">Save JSON</button>
+                <button onclick="document.getElementById('fileInput').click()">Load JSON</button>
                 <button onclick="exportCanvasAsPNG()">Export PNG</button>
                 <input type="file" id="fileInput" accept=".json" onchange="loadCanvas(event)">
-                <button onclick="loadCanvasFromStorage()">Restore Map</button>
-            </div>
-            
-            <div class="control-group">
+                <button onclick="loadCanvasFromStorage()">Restore Autosaved Map</button>
                 <button id="textModeBtn" onclick="toggleTextMode()">Text Mode: OFF</button>
-            </div>
-            <div class="control-group">
                 <button id="undoBtn" enabled onclick="undoLastAction()">Undo</button>
-            </div>
-            <div class="control-group">
                 <input type="checkbox" id="clickToAddMode">
                 <h4>Click-to-Add Mode</h4>
             </div>
