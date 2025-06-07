@@ -82,6 +82,7 @@
             background: white;
         }
         
+        /*
         .trash-can {
             position: fixed;
             bottom: 20px;
@@ -99,9 +100,38 @@
             transition: all 0.3s;
             z-index: 1000;
         }
+        */
+
+        .trashcan-container {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            text-align: center;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+            width: 60px;
+            }
+
+            .trash-can {
+            font-size: 32px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            }
+
+            .trash-can:hover {
+            transform: scale(1.2);
+            }
+
+            .version-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            }
         
         .trash-can.drag-over {
-            background: #ff0000;
+            background: #950000;
             transform: scale(1.2);
         }
         
@@ -320,7 +350,11 @@
             <canvas id="canvas" width="1200" height="600"></canvas>
         </div>
         
-        <div class="trash-can" id="trashCan">🗑️</div>
+        <div class="trashcan-container">
+            <div class="trash-can" id="trashCan">🗑️</div>
+            <div class="version-label" id="version-label"></div>
+        </div>
+
         
         <!-- Text Input Dialog -->
         <div class="text-input-overlay" id="textInputOverlay">
@@ -336,6 +370,9 @@
     </div>
 
     <script>
+        version = 1
+
+        document.getElementById('version-label').innerHTML = 'v' + version;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const colorPalette = document.getElementById('colorPalette');
