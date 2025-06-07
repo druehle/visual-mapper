@@ -239,6 +239,29 @@
         border-radius: 8px;
         box-shadow: 0 0 5px rgba(0,0,0,0.3);
         }
+
+        #undoBtn {
+            background: #ff6b6b;
+            color: white;
+            border: 2px solid #ff5252;
+        }
+
+        #undoBtn:hover {
+            background: #ff5252;
+            color: white;
+        }
+
+        #undoBtn:disabled {
+            background: #ccc;
+            color: #666;
+            border: 2px solid #bbb;
+            cursor: not-allowed;
+        }
+
+        #undoBtn:disabled:hover {
+            background: #ccc;
+            transform: none;
+        }
     </style>
 </head>
 <body >
@@ -256,7 +279,13 @@
             <div class="control-group">
                 <button id="textModeBtn" onclick="toggleTextMode()">Text Mode: OFF</button>
             </div>
-            
+            <div class="control-group">
+                <button id="undoBtn" enabled onclick="undoLastAction()">Undo</button>
+            </div>
+            <div class="control-group">
+                <input type="checkbox" id="clickToAddMode">
+                <h4>Click-to-Add Mode</h4>
+            </div>
             <div class="control-group">
                 <h4>Canvas Size:</h4>
                 <span id="canvasSize">1200×600</span>
@@ -281,7 +310,7 @@
                 <!-- Pattern squares will be generated here -->
             </div>
         </div>
-       
+      
         <div class="canvas-container">
             <canvas id="canvas" width="1200" height="600"></canvas>
         </div>
@@ -317,6 +346,9 @@
         let autoSaveInterval;
         let last;
 
+        let lastDrawRequestIsUndo = false;
+        let undoStack = [];
+        const MAX_UNDO_STEPS = 20;
         //startAutoSave(30000); //This starts auto-saving
         
         const GRID_SIZE = 40;
@@ -353,6 +385,9 @@
         let isTextMode = false;
         let pendingTextPosition = null;
 
+        let isClickToAddMode = false;
+        let lastSelectedItem = null; // Store the last clicked palette item
+
         const scale = miniMap.width / canvas.width;
 
         function drawMiniMap() {
@@ -362,6 +397,83 @@
             // Draw scaled-down main canvas
             miniCtx.drawImage(canvas, 0, 0, miniMap.width, miniMap.height);
         }
+
+        function saveStateForUndo() {
+            const currentState = {
+                squares: JSON.parse(JSON.stringify(placedSquares)),
+                texts: JSON.parse(JSON.stringify(placedTexts)),
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                timestamp: Date.now()
+            };
+            
+            undoStack.push(currentState);
+            
+            // Limit undo stack size
+            if (undoStack.length > MAX_UNDO_STEPS) {
+                undoStack.shift();
+            }
+            
+            // Update undo button state
+            updateUndoButton();
+        }
+
+        function undoLastAction() {
+            if (undoStack.length === 0) return;
+            
+            const previousState = undoStack.pop();
+            
+            if (last.type == 'square') {
+                lastDrawRequestIsUndo = true;
+            }
+
+
+            // Restore previous state
+            placedSquares = previousState.squares;
+            placedTexts = previousState.texts;
+            canvasWidth = previousState.canvasWidth;
+            canvasHeight = previousState.canvasHeight;
+            
+            // Update canvas if size changed
+            if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+                updateCanvasSize();
+            } else {
+                redraw();
+            }
+            
+            // Clear last selection
+            //last = null;
+            
+            // Update undo button state
+            updateUndoButton();
+        }
+
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undoBtn');
+            
+            if (undoStack.length == 0) {
+                undoBtn.disabled = true;
+            } else {
+                undoBtn.disabled = false;
+            }
+            
+        }
+
+        function toggleClickToAddMode() {
+            isClickToAddMode = document.getElementById('clickToAddMode').checked;
+        }
+
+
+        function getTextBounds(text) {
+            ctx.font = '16px Arial';
+            const metrics = ctx.measureText(text);
+            return {
+                width: metrics.width,
+                height: 16 // Approximate height for Arial 16px
+            };
+        }
+
+        document.getElementById('clickToAddMode').addEventListener('change', toggleClickToAddMode);
 
         window.addEventListener('beforeunload', function (e) {
             saveCanvasToLocalStorage();
@@ -376,6 +488,17 @@
             square.style.backgroundColor = color;
             square.draggable = true;
             square.dataset.color = color;
+            
+            // Add click handler to remember selection
+            square.addEventListener('click', () => {
+                lastSelectedItem = { type: 'color', color: color };
+                // Visual feedback - remove previous selection highlights
+                document.querySelectorAll('.color-square, .pattern-square').forEach(el => 
+                    el.style.border = '0px solid #000000'
+                );
+                // Highlight selected item
+                square.style.border = '3px solid #000';
+            });
             
             square.addEventListener('dragstart', (e) => {
                 dragData = { type: 'color', color: color };
@@ -397,6 +520,17 @@
             square.style.justifyContent = 'center';
             square.textContent = pattern.display;
             
+            // Add click handler to remember selection
+            square.addEventListener('click', () => {
+                lastSelectedItem = { type: 'pattern', pattern: pattern.name };
+                // Visual feedback - remove previous selection highlights
+                document.querySelectorAll('.color-square, .pattern-square').forEach(el => 
+                    el.style.border = '0px solid #000000'
+                );
+                // Highlight selected item
+                square.style.border = '3px solid #000';
+            });
+            
             square.addEventListener('dragstart', (e) => {
                 dragData = { type: 'pattern', pattern: pattern.name };
                 e.dataTransfer.effectAllowed = 'copy';
@@ -404,6 +538,7 @@
             
             patternPalette.appendChild(square);
         });
+
         
         // Draw grid lines
         function drawGrid() {
@@ -429,6 +564,40 @@
         
         // Draw all placed squares and text
         function drawSquares() {
+
+            placedTexts.forEach((textObj, index) => {
+                const bounds = getTextBounds(textObj.text);
+                const padding = 10;
+                
+                // Draw white background with padding
+                ctx.fillStyle = 'white';
+                ctx.fillRect(
+                    textObj.x - padding, 
+                    textObj.y - padding, 
+                    bounds.width + (padding * 2), 
+                    bounds.height + (padding * 2)
+                );
+                
+                /*
+                // Draw border around background
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 0;
+                ctx.strokeRect(
+                    textObj.x - padding, 
+                    textObj.y - padding, 
+                    bounds.width + (padding * 2), 
+                    bounds.height + (padding * 2)
+                );
+                */
+                
+                
+                // Draw text
+                ctx.fillStyle = '#333';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(textObj.text, textObj.x, textObj.y);
+            });
 
             placedSquares.forEach((square, index) => {
                 if (square.type === 'color') {
@@ -479,14 +648,13 @@
                 }
             });
 
-            
-            //if (last && (last.type === 'color' || last.type === "pattern")) {
-            if (last) {
+            if (last && lastDrawRequestIsUndo == false) {
                 ctx.strokeStyle = '#800000';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(last.x, last.y, GRID_SIZE, GRID_SIZE);
             }
-            
+            lastDrawRequestIsUndo = false;
+
             // Draw text
             placedTexts.forEach(textObj => {
                 ctx.fillStyle = '#333';
@@ -525,52 +693,16 @@
         function isPositionOccupied(x, y) {
             return placedSquares.some(square => square.x === x && square.y === y);
         }
-        
-        // Canvas drag and drop events
-        canvas.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        });
-        
-        canvas.addEventListener('drop', (e) => {
-            e.preventDefault();
-            
-            if (!dragData) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const snappedPos = snapToGrid(x, y);
-            
-            // Check bounds
-            if (snappedPos.x >= 0 && snappedPos.x + GRID_SIZE <= canvasWidth &&
-                snappedPos.y >= 0 && snappedPos.y + GRID_SIZE <= canvasHeight) {
                 
-                // Check if position is free
-                if (!isPositionOccupied(snappedPos.x, snappedPos.y)) {
-                    const newSquare = {
-                        x: snappedPos.x,
-                        y: snappedPos.y,
-                        type: dragData.type
-                    };
-                    
-                    if (dragData.type === 'color') {
-                        newSquare.color = dragData.color;
-                    } else if (dragData.type === 'pattern') {
-                        newSquare.pattern = dragData.pattern;
-                    }
-                    
-                    placedSquares.push(newSquare);
-                    redraw();
-                }
-            }
-            
-            dragData = null;
-            draggedSquareIndex = -1;
-        });
-        
-        // Canvas mouse events for dragging placed squares
+        function isPointInText(x, y, textObj) {
+            const bounds = getTextBounds(textObj.text);
+            const padding = 10;
+            return x >= textObj.x - padding && 
+                x <= textObj.x + bounds.width + padding &&
+                y >= textObj.y - padding && 
+                y <= textObj.y + bounds.height + padding;
+        }
+
         canvas.addEventListener('mousedown', (e) => {
             if (isTextMode) return; // Don't handle dragging in text mode
             
@@ -578,66 +710,100 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            const snappedPos = snapToGrid(x, y);
+            // Check if clicking on text first
+            const textIndex = placedTexts.findIndex(textObj => isPointInText(x, y, textObj));
             
-            // Find square at this position
-            const index = placedSquares.findIndex(square => 
-                square.x === snappedPos.x && square.y === snappedPos.y
-            );
-            
-            if (index !== -1) {
-                draggedSquareIndex = index;
-                const square = placedSquares[index];
+            if (textIndex !== -1) {
+                // Found text to drag
+                draggedTextIndex = textIndex;
+                const textObj = placedTexts[textIndex];
+                
+                // Set last selected item for highlighting
+                last = { type: 'text', index: textIndex };
+                
                 dragData = {
-                    type: square.type,
-                    color: square.color,
-                    pattern: square.pattern,
-                    fromCanvas: true
+                    type: 'text',
+                    text: textObj.text,
+                    fromCanvas: true,
+                    offsetX: x - textObj.x,
+                    offsetY: y - textObj.y
                 };
                 isDragging = true;
                 canvas.style.cursor = 'grabbing';
                 
-                // Remove square from canvas while dragging
-                placedSquares.splice(index, 1);
+                // Remove text from canvas while dragging
+                placedTexts.splice(textIndex, 1);
                 redraw();
+            } else {
+                // Check for squares
+                const snappedPos = snapToGrid(x, y);
+                
+                // Find square at this position
+                const index = placedSquares.findIndex(square => 
+                    square.x === snappedPos.x && square.y === snappedPos.y
+                );
+                
+                if (index !== -1) {
+                    draggedSquareIndex = index;
+                    const square = placedSquares[index];
+                    
+                    // Set last selected item for highlighting
+                    last = square;
+                    
+                    dragData = {
+                        type: square.type,
+                        color: square.color,
+                        pattern: square.pattern,
+                        fromCanvas: true
+                    };
+                    isDragging = true;
+                    canvas.style.cursor = 'grabbing';
+                    
+                    // Remove square from canvas while dragging
+                    placedSquares.splice(index, 1);
+                    redraw();
+                }
             }
         });
-        
-        // Handle text mode clicks
-        canvas.addEventListener('click', (e) => {
-            if (!isTextMode) return;
+
+        // Canvas drag and drop events
+        canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            
+            if (!dragData) return;
+
+            saveStateForUndo();
             
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Store the click position and show text input dialog
-            pendingTextPosition = { x: x, y: y };
-            showTextInput();
-        });
-        
-        canvas.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                // Visual feedback could be added here
-            }
-        });
-        
-        canvas.addEventListener('mouseup', (e) => {
-            if (isTextMode) return; // Don't handle dragging in text mode
-            
-            if (isDragging && dragData && dragData.fromCanvas) {
-                // Re-place the square if dropped on canvas
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
+            if (dragData.type === 'text') {
+                // Handle text dropping
+                const newText = {
+                    x: x,
+                    y: y,
+                    text: dragData.text
+                };
+                const newTextIndex = placedTexts.length;
+                placedTexts.push(newText);
                 
+                // Set as last selected
+                last = { type: 'text', index: newTextIndex };
+                
+                redraw();
+            } else {
+                // Handle square dropping (existing code)
                 const snappedPos = snapToGrid(x, y);
                 
-                // Check bounds
                 if (snappedPos.x >= 0 && snappedPos.x + GRID_SIZE <= canvasWidth &&
                     snappedPos.y >= 0 && snappedPos.y + GRID_SIZE <= canvasHeight) {
                     
-                    // Check if position is free
                     if (!isPositionOccupied(snappedPos.x, snappedPos.y)) {
                         const newSquare = {
                             x: snappedPos.x,
@@ -652,14 +818,134 @@
                         }
                         
                         placedSquares.push(newSquare);
+                        last = newSquare; // Set as last selected
                         redraw();
                     }
                 }
             }
             
+            dragData = null;
+            draggedSquareIndex = -1;
+            draggedTextIndex = -1;
+        });
+
+        
+        // Handle text mode clicks
+        canvas.addEventListener('click', (e) => {
+            if (isTextMode) {
+                // Existing text mode logic
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                pendingTextPosition = { x: x, y: y };
+                showTextInput();
+                return;
+            }
+            
+            // New click-to-add mode logic
+            if (isClickToAddMode && lastSelectedItem) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                saveStateForUndo();
+                
+                const snappedPos = snapToGrid(x, y);
+                
+                // Check bounds and if position is free
+                if (snappedPos.x >= 0 && snappedPos.x + GRID_SIZE <= canvasWidth &&
+                    snappedPos.y >= 0 && snappedPos.y + GRID_SIZE <= canvasHeight &&
+                    !isPositionOccupied(snappedPos.x, snappedPos.y)) {
+                    
+                    const newSquare = {
+                        x: snappedPos.x,
+                        y: snappedPos.y,
+                        type: lastSelectedItem.type
+                    };
+                    
+                    if (lastSelectedItem.type === 'color') {
+                        newSquare.color = lastSelectedItem.color;
+                    } else if (lastSelectedItem.type === 'pattern') {
+                        newSquare.pattern = lastSelectedItem.pattern;
+                    }
+                    
+                    placedSquares.push(newSquare);
+                    last = newSquare;
+                    redraw();
+                }
+            }
+        });
+
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (isTextMode) return; // Don't handle dragging in text mode
+            
+            if (isDragging && dragData && dragData.fromCanvas) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                if (dragData.type === 'text') {
+                    // Re-place the text at new position
+                    const adjustedX = x - (dragData.offsetX || 0);
+                    const adjustedY = y - (dragData.offsetY || 0);
+                    
+                    // Keep text within bounds
+                    const bounds = getTextBounds(dragData.text);
+                    const padding = 10;
+                    const finalX = Math.max(padding, Math.min(adjustedX, canvasWidth - bounds.width - padding));
+                    const finalY = Math.max(padding, Math.min(adjustedY, canvasHeight - 16 - padding));
+                    
+                    const newText = {
+                        x: finalX,
+                        y: finalY,
+                        text: dragData.text
+                    };
+                    
+                    // Add the text back to the array
+                    const newTextIndex = placedTexts.length;
+                    placedTexts.push(newText);
+                    
+                    // Set as last selected
+                    last = { type: 'text', index: newTextIndex };
+                    
+                    redraw();
+                } else {
+                    // Handle square dropping (existing logic)
+                    const snappedPos = snapToGrid(x, y);
+                    
+                    // Check bounds
+                    if (snappedPos.x >= 0 && snappedPos.x + GRID_SIZE <= canvasWidth &&
+                        snappedPos.y >= 0 && snappedPos.y + GRID_SIZE <= canvasHeight) {
+                        
+                        // Check if position is free
+                        if (!isPositionOccupied(snappedPos.x, snappedPos.y)) {
+                            const newSquare = {
+                                x: snappedPos.x,
+                                y: snappedPos.y,
+                                type: dragData.type
+                            };
+                            
+                            if (dragData.type === 'color') {
+                                newSquare.color = dragData.color;
+                            } else if (dragData.type === 'pattern') {
+                                newSquare.pattern = dragData.pattern;
+                            }
+                            
+                            placedSquares.push(newSquare);
+                            last = newSquare;
+                            redraw();
+                        }
+                    }
+                }
+            }
+            
+            // Reset all drag state
             isDragging = false;
             dragData = null;
             draggedSquareIndex = -1;
+            draggedTextIndex = -1;
             canvas.style.cursor = isTextMode ? 'text' : 'crosshair';
         });
         
@@ -677,20 +963,27 @@
             e.preventDefault();
             trashCan.classList.remove('drag-over');
             
-            // If dragging from canvas, the square is already removed
+            // Save state before deletion
             if (dragData && dragData.fromCanvas) {
-                // Square is deleted (not re-added to canvas)
+                saveStateForUndo();
+            }
+            
+            // If dragging from canvas, the item is already removed
+            if (dragData && dragData.fromCanvas) {
+                // Item is deleted (not re-added to canvas)
             }
             
             dragData = null;
             draggedSquareIndex = -1;
+            draggedTextIndex = -1;
             redraw();
         });
         
         // Canvas expansion functions
         function expandCanvas(direction) {
+            saveStateForUndo();
             const expansion = 200;
-            
+
             switch (direction) {
                 case 'top':
                     canvasHeight += expansion;
@@ -748,11 +1041,17 @@
         function confirmTextInput() {
             const text = textInput.value.trim();
             if (text && pendingTextPosition) {
+                // Save state before adding text
+                saveStateForUndo();
+                
+                const newTextIndex = placedTexts.length;
                 placedTexts.push({
                     x: pendingTextPosition.x,
                     y: pendingTextPosition.y,
                     text: text
                 });
+                
+                last = { type: 'text', index: newTextIndex };
                 redraw();
             }
             textInputOverlay.style.display = 'none';
@@ -768,6 +1067,17 @@
             }
         });
         
+        window.addEventListener('load', () => {
+            updateUndoButton();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undoLastAction();
+            }
+        });
+
         // Save canvas data to localStorage
         function saveCanvasToLocalStorage() {
             const saveData = {
