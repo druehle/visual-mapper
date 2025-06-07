@@ -371,7 +371,7 @@
     </div>
 
     <script>
-        version = 1.1
+        version = 1.2
 
         document.getElementById('version-label').innerHTML = 'v' + version;
         const canvas = document.getElementById('canvas');
@@ -393,8 +393,7 @@
 
         let lastDrawRequestIsUndo = false;
         let undoStack = [];
-        const MAX_UNDO_STEPS = 20;
-        //startAutoSave(30000); //This starts auto-saving
+        const MAX_UNDO_STEPS = 5;
         
         const GRID_SIZE = 40;
         const colors = [
