@@ -1,3 +1,15 @@
+<!--
+  ===============================================
+  File: index.html
+  Author: Dave R.
+  Description: Simple mud mapper; do whatever
+               you want with it. This is all in
+               a single file for portability.
+  License: Unlicense
+  Date: June 6, 2025
+  ===============================================
+-->
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -420,9 +432,14 @@
 
         function undoLastAction() {
             if (undoStack.length === 0) return;
-            
+
             const previousState = undoStack.pop();
             
+            // Clear last selection
+            if (undoStack.length === 0) {
+                redraw();
+            }
+
             if (last.type == 'square') {
                 lastDrawRequestIsUndo = true;
             }
@@ -441,7 +458,7 @@
                 redraw();
             }
             
-            // Clear last selection
+
             //last = null;
             
             // Update undo button state
@@ -475,12 +492,6 @@
 
         document.getElementById('clickToAddMode').addEventListener('change', toggleClickToAddMode);
 
-        window.addEventListener('beforeunload', function (e) {
-            saveCanvasToLocalStorage();
-            e.preventDefault();
-            e.returnValue = ''; // Required for Chrome to show prompt
-        });
-        
         // Create color palette
         colors.forEach(color => {
             const square = document.createElement('div');
@@ -539,7 +550,12 @@
             patternPalette.appendChild(square);
         });
 
-        
+        window.addEventListener('beforeunload', function (e) {
+            saveCanvasToLocalStorage();
+            e.preventDefault();
+            e.returnValue = ''; // Required for Chrome to show prompt
+        });
+
         // Draw grid lines
         function drawGrid() {
             ctx.strokeStyle = '#ddd';
@@ -646,9 +662,10 @@
                     }
                     ctx.stroke();
                 }
+                saveCanvasToLocalStorage();
             });
-
-            if (last && lastDrawRequestIsUndo == false) {
+            
+            if (last && lastDrawRequestIsUndo == false && placedSquares.length > 0) {
                 ctx.strokeStyle = '#800000';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(last.x, last.y, GRID_SIZE, GRID_SIZE);
@@ -671,6 +688,7 @@
             drawGrid();
             drawSquares();
             drawMiniMap();
+            
         }
         
         // Update canvas size
@@ -1085,9 +1103,9 @@
                 height: canvasHeight,
                 squares: placedSquares,
                 texts: placedTexts,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                undoStack: undoStack
             };
-
             localStorage.setItem('savedCanvas', JSON.stringify(saveData));
             console.log(`[${new Date().toLocaleTimeString()}] Canvas auto-saved to localStorage.`);
         }
@@ -1098,7 +1116,7 @@
 
             const savedData = localStorage.getItem('savedCanvas');
             if (!savedData) {
-                alert("No saved canvas data found.");
+                alert("No saved map data found.");
                 return;
             }
 
@@ -1108,20 +1126,13 @@
                 canvasHeight = data.height;
                 placedSquares = data.squares;
                 placedTexts = data.texts;
+                undoStack = data.undoStack;
                 console.log("Canvas data loaded from localStorage.");
 
                 updateCanvasSize();
+                updateUndoButton();
             }
         }
-
-        //Start AutoSave function
-        function startAutoSave(intervalMs = 30000) {
-            if (autoSaveInterval) return; // Prevent multiple intervals
-
-            autoSaveInterval = setInterval(saveCanvasToLocalStorage, intervalMs);
-            console.log(`Auto-save started, every ${intervalMs / 1000} seconds.`);
-        }
-
 
         // Save canvas function
         function saveCanvas() {
@@ -1163,7 +1174,7 @@
                         
                         updateCanvasSize();
                         
-                        alert('Canvas loaded successfully!');
+                        alert('Map loaded successfully!');
                     } else {
                         alert('Invalid file format!');
                     }
