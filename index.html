@@ -318,6 +318,7 @@
                 <button onclick="loadCanvasFromStorage()">Restore Autosaved Map</button>
                 <button id="textModeBtn" onclick="toggleTextMode()">Text Mode: OFF</button>
                 <button id="undoBtn" enabled onclick="undoLastAction()">Undo</button>
+                <button id="addModeBtn" onclick="toggleClickToAddMode()">Click-to-Add Mode: OFF</button>
                 <input type="checkbox" id="clickToAddMode">
                 <h4>Click-to-Add Mode</h4>
             </div>
@@ -370,7 +371,7 @@
     </div>
 
     <script>
-        version = 1
+        version = 1.1
 
         document.getElementById('version-label').innerHTML = 'v' + version;
         const canvas = document.getElementById('canvas');
@@ -381,6 +382,8 @@
         const textInputOverlay = document.getElementById('textInputOverlay');
         const textInput = document.getElementById('textInput');
         const textModeBtn = document.getElementById('textModeBtn');
+        const addModeBtn = document.getElementById('addModeBtn');
+
 
         const miniMap = document.getElementById('miniMap');
         const miniCtx = miniMap.getContext('2d');
@@ -506,11 +509,6 @@
             
         }
 
-        function toggleClickToAddMode() {
-            isClickToAddMode = document.getElementById('clickToAddMode').checked;
-        }
-
-
         function getTextBounds(text) {
             ctx.font = '16px Arial';
             const metrics = ctx.measureText(text);
@@ -520,15 +518,14 @@
             };
         }
 
-        document.getElementById('clickToAddMode').addEventListener('change', toggleClickToAddMode);
-
         // Create color palette
-        colors.forEach(color => {
+        colors.forEach((color, index) => {
             const square = document.createElement('div');
             square.className = 'color-square';
             square.style.backgroundColor = color;
             square.draggable = true;
             square.dataset.color = color;
+            square.id = "colorPalette" + index;
             
             // Add click handler to remember selection
             square.addEventListener('click', () => {
@@ -546,6 +543,14 @@
                 e.dataTransfer.effectAllowed = 'copy';
             });
             
+            alert(index);
+
+            if (index == 10) {
+                lastSelectedItem = { type: 'color', color: color };
+                square.style.border = '3px solid #000';
+
+            }
+
             colorPalette.appendChild(square);
         });
         
@@ -995,6 +1000,7 @@
             draggedSquareIndex = -1;
             draggedTextIndex = -1;
             canvas.style.cursor = isTextMode ? 'text' : 'crosshair';
+            canvas.style.cursor = isClickToAddMode ? 'pointer' : 'crosshair';
         });
         
         // Trash can functionality
@@ -1074,7 +1080,15 @@
             textModeBtn.style.color = isTextMode ? 'white' : 'black';
             canvas.style.cursor = isTextMode ? 'text' : 'crosshair';
         }
-        
+
+        function toggleClickToAddMode() {
+            isClickToAddMode = !isClickToAddMode;
+            addModeBtn.textContent = `Click-to-Add Mode: ${isClickToAddMode ? 'ON' : 'OFF'}`;
+            addModeBtn.style.background = isClickToAddMode ? "#4ECDC4" : 'white';
+            addModeBtn.style.color = isClickToAddMode ? 'white' : 'black';
+            canvas.style.cursor = isClickToAddMode ? 'pointer' : 'crosshair';
+        }
+      
         function showTextInput() {
             textInputOverlay.style.display = 'flex';
             textInput.value = '';
@@ -1117,6 +1131,7 @@
         
         window.addEventListener('load', () => {
             updateUndoButton();
+            toggleClickToAddMode();
         });
 
         document.addEventListener('keydown', (e) => {
@@ -1133,8 +1148,11 @@
                 height: canvasHeight,
                 squares: placedSquares,
                 texts: placedTexts,
+                undoStack: undoStack,
+                isClickToAddMode: isClickToAddMode,
+                isTextMode: isTextMode,
                 timestamp: new Date().toISOString(),
-                undoStack: undoStack
+                
             };
             localStorage.setItem('savedCanvas', JSON.stringify(saveData));
             console.log(`[${new Date().toLocaleTimeString()}] Canvas auto-saved to localStorage.`);
@@ -1157,6 +1175,8 @@
                 placedSquares = data.squares;
                 placedTexts = data.texts;
                 undoStack = data.undoStack;
+                isClickToAddMode = data.isClickToAddMode;
+                isTextMode = data.isTextMode;
                 console.log("Canvas data loaded from localStorage.");
 
                 updateCanvasSize();
