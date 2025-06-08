@@ -81,26 +81,6 @@
         .pattern-square {
             background: white;
         }
-        
-        /*
-        .trash-can {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 80px;
-            height: 80px;
-            background: #ffffff;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            color: white;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            transition: all 0.3s;
-            z-index: 1000;
-        }
-        */
 
         .trashcan-container {
             position: fixed;
@@ -317,10 +297,8 @@
                 <input type="file" id="fileInput" accept=".json" onchange="loadCanvas(event)">
                 <button onclick="loadCanvasFromStorage()">Restore Autosaved Map</button>
                 <button id="textModeBtn" onclick="toggleTextMode()">Text Mode: OFF</button>
-                <button id="undoBtn" enabled onclick="undoLastAction()">Undo</button>
                 <button id="addModeBtn" onclick="toggleClickToAddMode()">Click-to-Add Mode: OFF</button>
-                <input type="checkbox" id="clickToAddMode">
-                <h4>Click-to-Add Mode</h4>
+                <button id="undoBtn" enabled onclick="undoLastAction()">Undo</button>
             </div>
             <div class="control-group">
                 <h4>Canvas Size:</h4>
@@ -389,7 +367,7 @@
         const miniCtx = miniMap.getContext('2d');
 
         let autoSaveInterval;
-        let last;
+        let lastSquare;
 
         let lastDrawRequestIsUndo = false;
         let undoStack = [];
@@ -405,7 +383,7 @@
         '#6AD3C9', // Soft Cyan
         '#FFEB99', // Muted Bright Yellow
         '#64B5F6', // Muted Bright Blue
-        '#CE93D8', // Muted Bright Magenta
+        '#A5DAA1', // Lighter Green
         '#4DD0E1', // Muted Bright Cyan
         '#999999', // Soft Gray (ANSI Black)
         '#F4A261', // Soft Orange
@@ -472,7 +450,7 @@
                 redraw();
             }
 
-            if (last.type == 'square') {
+            if (lastSquare.type == 'square') {
                 lastDrawRequestIsUndo = true;
             }
 
@@ -490,8 +468,6 @@
                 redraw();
             }
             
-
-            //last = null;
             
             // Update undo button state
             updateUndoButton();
@@ -655,7 +631,7 @@
                     ctx.strokeStyle = square.color;//'#DDD';
                     ctx.lineWidth = 0;
                     ctx.strokeRect(square.x, square.y, GRID_SIZE, GRID_SIZE);
-                    last = placedSquares[index];
+                    lastSquare = placedSquares[index];
 
                 } else if (square.type === 'pattern') {
                     // Draw pattern square
@@ -697,10 +673,10 @@
                 saveCanvasToLocalStorage();
             });
             
-            if (last && lastDrawRequestIsUndo == false && placedSquares.length > 0) {
+            if (lastSquare && lastDrawRequestIsUndo == false && placedSquares.length > 0) {
                 ctx.strokeStyle = '#800000';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(last.x, last.y, GRID_SIZE, GRID_SIZE);
+                ctx.strokeRect(lastSquare.x, lastSquare.y, GRID_SIZE, GRID_SIZE);
             }
             lastDrawRequestIsUndo = false;
 
@@ -769,7 +745,7 @@
                 const textObj = placedTexts[textIndex];
                 
                 // Set last selected item for highlighting
-                last = { type: 'text', index: textIndex };
+                lastSquare = { type: 'text', index: textIndex };
                 
                 dragData = {
                     type: 'text',
@@ -798,7 +774,7 @@
                     const square = placedSquares[index];
                     
                     // Set last selected item for highlighting
-                    last = square;
+                    lastSquare = square;
                     
                     dragData = {
                         type: square.type,
@@ -844,7 +820,7 @@
                 placedTexts.push(newText);
                 
                 // Set as last selected
-                last = { type: 'text', index: newTextIndex };
+                lastSquare = { type: 'text', index: newTextIndex };
                 
                 redraw();
             } else {
@@ -868,7 +844,7 @@
                         }
                         
                         placedSquares.push(newSquare);
-                        last = newSquare; // Set as last selected
+                        lastSquare = newSquare; // Set as last selected
                         redraw();
                     }
                 }
@@ -921,7 +897,7 @@
                     }
                     
                     placedSquares.push(newSquare);
-                    last = newSquare;
+                    lastSquare = newSquare;
                     redraw();
                 }
             }
@@ -958,7 +934,7 @@
                     placedTexts.push(newText);
                     
                     // Set as last selected
-                    last = { type: 'text', index: newTextIndex };
+                    lastSquare = { type: 'text', index: newTextIndex };
                     
                     redraw();
                 } else {
@@ -984,7 +960,7 @@
                             }
                             
                             placedSquares.push(newSquare);
-                            last = newSquare;
+                            lastSquare = newSquare;
                             redraw();
                         }
                     }
@@ -998,6 +974,7 @@
             draggedTextIndex = -1;
             canvas.style.cursor = isTextMode ? 'text' : 'crosshair';
             canvas.style.cursor = isClickToAddMode ? 'pointer' : 'crosshair';
+
         });
         
         // Trash can functionality
@@ -1027,9 +1004,21 @@
             dragData = null;
             draggedSquareIndex = -1;
             draggedTextIndex = -1;
+            isDragging = false;
+            
+            canvas.style.cursor = isClickToAddMode ? 'pointer' : 'crosshair';
             redraw();
         });
         
+        canvas.addEventListener('mouseleave', function(e) {
+            dragData = null;
+            draggedSquareIndex = -1;
+            draggedTextIndex = -1;
+            isDragging = false;
+            
+            canvas.style.cursor = isClickToAddMode ? 'pointer' : 'crosshair';
+        });
+
         // Canvas expansion functions
         function expandCanvas(direction) {
             saveStateForUndo();
@@ -1110,7 +1099,7 @@
                     text: text
                 });
                 
-                last = { type: 'text', index: newTextIndex };
+                lastSquare = { type: 'text', index: newTextIndex };
                 redraw();
             }
             textInputOverlay.style.display = 'none';
