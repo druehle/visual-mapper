@@ -349,7 +349,7 @@
     </div>
 
     <script>
-        version = 1.2
+        version = 1.3
 
         document.getElementById('version-label').innerHTML = 'v' + version;
         const canvas = document.getElementById('canvas');
@@ -366,13 +366,8 @@
         const miniMap = document.getElementById('miniMap');
         const miniCtx = miniMap.getContext('2d');
 
-        let autoSaveInterval;
         let lastSquare;
-
-        let lastDrawRequestIsUndo = false;
-        let undoStack = [];
-        const MAX_UNDO_STEPS = 5;
-        
+ 
         const GRID_SIZE = 40;
         const colors = [
         '#E57373', // Muted Bright Red
@@ -420,63 +415,17 @@
             miniCtx.drawImage(canvas, 0, 0, miniMap.width, miniMap.height);
         }
 
-        function saveStateForUndo() {
-            const currentState = {
-                squares: JSON.parse(JSON.stringify(placedSquares)),
-                texts: JSON.parse(JSON.stringify(placedTexts)),
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight,
-                timestamp: Date.now()
-            };
-            
-            undoStack.push(currentState);
-            
-            // Limit undo stack size
-            if (undoStack.length > MAX_UNDO_STEPS) {
-                undoStack.shift();
-            }
-            
-            // Update undo button state
-            updateUndoButton();
-        }
-
         function undoLastAction() {
-            if (undoStack.length === 0) return;
-
-            const previousState = undoStack.pop();
-            
-            // Clear last selection
-            if (undoStack.length === 0) {
-                redraw();
-            }
-
-            if (lastSquare.type == 'square') {
-                lastDrawRequestIsUndo = true;
-            }
-
-
-            // Restore previous state
-            placedSquares = previousState.squares;
-            placedTexts = previousState.texts;
-            canvasWidth = previousState.canvasWidth;
-            canvasHeight = previousState.canvasHeight;
-            
-            // Update canvas if size changed
-            if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
-                updateCanvasSize();
-            } else {
-                redraw();
-            }
-            
-            
-            // Update undo button state
+            if (placedSquares.length === 0) return;
+            placedSquares.pop();
             updateUndoButton();
+            redraw();
         }
 
         function updateUndoButton() {
             const undoBtn = document.getElementById('undoBtn');
             
-            if (undoStack.length == 0) {
+            if (placedSquares.length == 0) {
                 undoBtn.disabled = true;
             } else {
                 undoBtn.disabled = false;
@@ -673,12 +622,11 @@
                 saveCanvasToLocalStorage();
             });
             
-            if (lastSquare && lastDrawRequestIsUndo == false && placedSquares.length > 0) {
+            if (lastSquare && placedSquares.length > 0) {
                 ctx.strokeStyle = '#800000';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(lastSquare.x, lastSquare.y, GRID_SIZE, GRID_SIZE);
             }
-            lastDrawRequestIsUndo = false;
 
             // Draw text
             placedTexts.forEach(textObj => {
@@ -696,7 +644,7 @@
             drawGrid();
             drawSquares();
             drawMiniMap();
-            
+            updateUndoButton();
         }
         
         // Update canvas size
@@ -803,8 +751,6 @@
             
             if (!dragData) return;
 
-            saveStateForUndo();
-            
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -874,8 +820,6 @@
                 const rect = canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
-                
-                saveStateForUndo();
                 
                 const snappedPos = snapToGrid(x, y);
                 
@@ -991,11 +935,6 @@
             e.preventDefault();
             trashCan.classList.remove('drag-over');
             
-            // Save state before deletion
-            if (dragData && dragData.fromCanvas) {
-                saveStateForUndo();
-            }
-            
             // If dragging from canvas, the item is already removed
             if (dragData && dragData.fromCanvas) {
                 // Item is deleted (not re-added to canvas)
@@ -1021,7 +960,6 @@
 
         // Canvas expansion functions
         function expandCanvas(direction) {
-            saveStateForUndo();
             const expansion = 200;
 
             switch (direction) {
@@ -1089,9 +1027,6 @@
         function confirmTextInput() {
             const text = textInput.value.trim();
             if (text && pendingTextPosition) {
-                // Save state before adding text
-                saveStateForUndo();
-                
                 const newTextIndex = placedTexts.length;
                 placedTexts.push({
                     x: pendingTextPosition.x,
@@ -1134,7 +1069,6 @@
                 height: canvasHeight,
                 squares: placedSquares,
                 texts: placedTexts,
-                undoStack: undoStack,
                 isClickToAddMode: isClickToAddMode,
                 isTextMode: isTextMode,
                 timestamp: new Date().toISOString(),
@@ -1160,7 +1094,6 @@
                 canvasHeight = data.height;
                 placedSquares = data.squares;
                 placedTexts = data.texts;
-                undoStack = data.undoStack;
                 isClickToAddMode = data.isClickToAddMode;
                 isTextMode = data.isTextMode;
                 console.log("Canvas data loaded from localStorage.");
