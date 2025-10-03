@@ -92,25 +92,54 @@
             border-radius: 8px;
             box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
             width: 60px;
-            }
+        }
 
-            .trash-can {
+        .trash-can {
             font-size: 32px;
             cursor: pointer;
             transition: transform 0.2s ease;
-            }
+        }
 
-            .trash-can:hover {
+        .help-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            border: 2px solid #4ECDC4;
+            background: #ffffff;
+            color: #4ECDC4;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+        }
+
+        .help-button:hover {
+            background: #4ECDC4;
+            color: #ffffff;
+            transform: translateY(-2px);
+        }
+
+        .help-button:focus {
+            outline: 2px solid #3ab7af;
+            outline-offset: 2px;
+        }
+
+        .trash-can:hover {
             transform: scale(1.2);
-            }
+        }
 
-            .version-label {
+        .version-label {
             font-size: 12px;
             color: #666;
             margin-top: 4px;
-            }
-        
+        }
+
         .trash-can.drag-over {
+
             background: #950000;
             transform: scale(1.2);
         }
@@ -329,9 +358,32 @@
             cursor: crosshair;
         }
         
+        .mini-map-wrapper {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.9);
+            border: 2px solid rgb(122, 122, 122);
+            border-radius: 8px;
+            padding: 8px 12px 12px;
+            text-align: center;
+            z-index: 10;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .mini-map-label {
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
         #miniMap {
-        border-radius: 8px;
-        box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            display: block;
+            border: 1px solid rgba(122, 122, 122, 0.6);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.9);
         }
 
         #undoBtn {
@@ -359,7 +411,7 @@
     </style>
 </head>
 <body >
-    <div class="usage-overlay" id="usageOverlay" role="dialog" aria-modal="true" aria-labelledby="usageOverlayTitle" aria-describedby="usageOverlayList">
+    <div class="usage-overlay hidden" id="usageOverlay" role="dialog" aria-modal="true" aria-labelledby="usageOverlayTitle" aria-describedby="usageOverlayList">
         <div class="usage-overlay__content">
             <h2 class="usage-overlay__title" id="usageOverlayTitle">Welcome to Visual Mapper</h2>
             <p>Quick tips to get started:</p>
@@ -401,7 +453,10 @@
                 </div>
             </div>
 
-            <canvas id="miniMap" width="160" height="120" style="position: absolute; top: 10px; right: 10px; border: 2px solid rgb(122, 122, 122); background: rgba(255,255,255,0.8); z-index: 10;"></canvas>
+            <div class="mini-map-wrapper">
+                <div class="mini-map-label">MINIMAP</div>
+                <canvas id="miniMap" width="160" height="120"></canvas>
+            </div>
 
             <div class="color-squares" id="colorPalette">
                 <!-- Color squares will be generated here -->
@@ -416,6 +471,7 @@
         </div>
         
         <div class="trashcan-container">
+            <button type="button" class="help-button" id="helpOverlayBtn" aria-label="Show help overlay">?</button>
             <div class="trash-can" id="trashCan">🗑️</div>
             <div class="version-label" id="version-label"></div>
         </div>
@@ -449,6 +505,7 @@
         const addModeBtn = document.getElementById('addModeBtn');
         const usageOverlay = document.getElementById('usageOverlay');
         const closeUsageOverlayBtn = document.getElementById('closeUsageOverlayBtn');
+        const helpOverlayBtn = document.getElementById('helpOverlayBtn');
 
 
         const miniMap = document.getElementById('miniMap');
@@ -456,9 +513,47 @@
 
         let lastSquare;
 
+        const HELP_OVERLAY_STORAGE_KEY = 'visualMapperHelpAutoShows';
+        const HELP_OVERLAY_MAX_AUTO_SHOWS = 3;
+
+        function getHelpOverlayAutoShowCount() {
+            try {
+                const storedValue = localStorage.getItem(HELP_OVERLAY_STORAGE_KEY);
+                const parsedValue = parseInt(storedValue, 10);
+                return Number.isNaN(parsedValue) ? 0 : parsedValue;
+            } catch (error) {
+                return 0;
+            }
+        }
+
+        function incrementHelpOverlayAutoShowCount() {
+            try {
+                const nextCount = Math.min(getHelpOverlayAutoShowCount() + 1, HELP_OVERLAY_MAX_AUTO_SHOWS);
+                localStorage.setItem(HELP_OVERLAY_STORAGE_KEY, nextCount);
+            } catch (error) {
+                // Ignore storage errors (e.g., private browsing)
+            }
+        }
+
+        function shouldAutoShowHelpOverlay() {
+            return getHelpOverlayAutoShowCount() < HELP_OVERLAY_MAX_AUTO_SHOWS;
+        }
+
         function hideUsageOverlay() {
             if (usageOverlay && !usageOverlay.classList.contains('hidden')) {
                 usageOverlay.classList.add('hidden');
+                if (helpOverlayBtn) {
+                    helpOverlayBtn.focus();
+                }
+            }
+        }
+
+        function showUsageOverlay() {
+            if (usageOverlay) {
+                usageOverlay.classList.remove('hidden');
+                if (closeUsageOverlayBtn) {
+                    closeUsageOverlayBtn.focus();
+                }
             }
         }
 
@@ -471,6 +566,12 @@
                 if (event.target === usageOverlay) {
                     hideUsageOverlay();
                 }
+            });
+        }
+
+        if (helpOverlayBtn) {
+            helpOverlayBtn.addEventListener('click', () => {
+                showUsageOverlay();
             });
         }
 
@@ -1165,8 +1266,10 @@
         window.addEventListener('load', () => {
             updateUndoButton();
             toggleClickToAddMode();
-            if (closeUsageOverlayBtn) {
-                closeUsageOverlayBtn.focus();
+
+            if (shouldAutoShowHelpOverlay()) {
+                showUsageOverlay();
+                incrementHelpOverlayAutoShowCount();
             }
         });
 
@@ -1359,3 +1462,4 @@
     </script>
 </body>
 </html>
+
